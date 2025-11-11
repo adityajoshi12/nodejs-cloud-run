@@ -8,7 +8,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    permissions:
+      packages: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,21 +18,29 @@ jobs:
         uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
 
-      - name: Build and push Docker image
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Docker image
         run: |
-          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/my-node-app
+          # docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+          # docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+          gcloud builds submit --tag us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/my-node-app/app:${{ github.sha }} .
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy my-node-app \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/my-node-app \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/my-node-app/app:${{ github.sha }} \
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated
